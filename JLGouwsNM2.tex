@@ -14,27 +14,27 @@
 \usepackage{booktabs,multirow}
 \usepackage{bm}
 \usepackage{tensor}
-\usepackage{listings}
+%\usepackage{listings}
 \usepackage{slashed}
 \usepackage{tikz-feynman}
- \lstset{
-    basicstyle=\ttfamily\small,
-    numberstyle=\footnotesize,
-    numbers=left,
-    backgroundcolor=\color{gray!10},
-    frame=single,
-    tabsize=2,
-    rulecolor=\color{black!30},
-    title=\lstname,
-    escapeinside={\%*}{*)},
-    breaklines=true,
-    breakatwhitespace=true,
-    framextopmargin=2pt,
-    framexbottommargin=2pt,
-    inputencoding=utf8,
-    extendedchars=true,
-    literate={á}{{$\rho$}}1 {ã}{{\~a}}1 {é}{{\'e}}1,
-}
+% \lstset{
+%    basicstyle=\ttfamily\small,
+%    numberstyle=\footnotesize,
+%    numbers=left,
+%    backgroundcolor=\color{gray!10},
+%    frame=single,
+%    tabsize=2,
+%    rulecolor=\color{black!30},
+%    title=\lstname,
+%    escapeinside={\%*}{*)},
+%    breaklines=true,
+%    breakatwhitespace=true,
+%    framextopmargin=2pt,
+%    framexbottommargin=2pt,
+%    inputencoding=utf8,
+%    extendedchars=true,
+%    literate={á}{{$\rho$}}1 {ã}{{\~a}}1 {é}{{\'e}}1,
+%}
 \DeclareMathOperator{\sign}{sgn}
 
 \usetikzlibrary{decorations.text, calc}
@@ -71,7 +71,7 @@
 %}
 
 \title{
-\textsc{Standard Model Homework 2}
+\textsc{Numerical Methods Homework 2}
 }
 \author{\textsc{J L Gouws}
 }
@@ -82,7 +82,7 @@
 
 \usepackage{graphicx}
 \usepackage{array}
-
+\usepackage{jlcode}
 
 
 
@@ -91,44 +91,196 @@
 
 \maketitle
 
-This homework is a bit rough, but I am submitting it anyway for feedback.
 \begin{enumerate}
   \item
+    The source code is available \href{https://github.com/JLGouws/PSINumericalMethodsHomework2}{here}. I did it in a script as it was easier for me to work with.
+    I used the following packages: 
+Printf,
+LaTeXStrings,
+CairoMakie, 
+HCubature, 
+SphericalHarmonics, 
+LegendrePolynomials, and
+DifferentialEquations.
+
     \begin{enumerate}
       \item
+        I use the spherical harmonics package to determine the spherical harmonics and then hcubature to determine the coeficients of the function expansion.
+\begin{jllisting}
+expandSphericalHarmonics2(f, lₘₐₓ) = hcubature(
+  x -> sin(x[1]) * f(x[1], x[2]) .* conj(flattenSHArray(computeYlm(x[1], x[2], lmax = lₘₐₓ)))
+  , [0, 0], [π, 2 * π]
+)
+\end{jllisting}
+  Where I wrote a function to convert the output of spherical harmonic function into a flat array:
+\begin{jllisting}
+function flattenSHArray(shArray, lₘₐₓ)
+  l = 0
+  m = 0
+  coeffVector::Array{ComplexF64} = []
+  for a in 0:lₘₐₓ * (lₘₐₓ + 2)
+    push!(coeffVector, shArray[(l, m)])
+    if m == l
+      l+=1
+      m = -l
+    else
+      m+=1
+    end
+  end
+  coeffVector
+end
+\end{jllisting}
+\item
+  I will use these initial conditions for the wave equation:
+
+\begin{jllisting}
+  ϕ₀(θ, ϕ) = exp( - θ^2 / 0.4);
+  ψ₀(θ, ϕ) = 0;
+\end{jllisting}
+And next I will detail the more technical details of the numerical solver.
+I wrote this function to differentiate an array of spherical harmonic coefficents from an expansion.
+\begin{jllisting}
+function LaplacianSphericalCoefficientsArrays(coeffs)
+  l = 0
+  m = 0
+  coeffVector::Array{ComplexF64} = []
+  for a in coeffs
+    push!(coeffVector, - l * (l + 1) * a) #multiply coefficient by correct factor
+    if m == l
+      l+=1
+      m = -l
+    else
+      m+=1
+    end
+  end
+  coeffVector
+end
+\end{jllisting}
+        Now we have all the ingredients to write a function that will solve the wave equation:
+\begin{jllisting}
+function waveSystem(U)
+    half = Int(size(U)[1] // 2)
+    ϕ = U[begin:half] #split the state vector in two
+    ψ = U[half + 1:end]    
+    vcat(ψ, LaplacianSphericalCoefficientsArrays(ϕ)) #concatenate the two
+end
+
+function solveWaveEquation(ϕ₀, ψ₀, N, t₀, t₁)
+  ϕ₀SphericalCoeffs = expandSphericalHarmonics2(ϕ₀, N)[1]; #get expanstion of
+  ψ₀SphericalCoeffs = expandSphericalHarmonics2(ψ₀, N)[1]; # initial conditions
+
+  alg = DP5()
+  U0 = vcat( ϕ₀SphericalCoeffs, ψ₀SphericalCoeffs)         #I solve this with an
+  prob = ODEProblem((U,p,t) -> waveSystem(U), U0, (t₀, t₁))# an integrator from a pacakage 
+  solve(prob, alg)
+end
+\end{jllisting}
+As can be seen from the above code I use a solver in the DifferentialEquations package.
+And do some accounting to keep track of the different arrays for $\phi$ and $\psi$.
+        And lastly we need a function that will give us a function from these coefficients: 
+\begin{jllisting}
+function functionFromSphericalCoefficients(coeffs)
+  l = 0
+  m = 0
+  lₘₐₓ = 0
+  for a in 1:size(coeffs)[1]
+    lₘₐₓ = l
+    if m == l
+      l+=1
+      m = -l
+    else
+      m+=1
+    end
+  end
+  function f(θ, ϕ)
+    harmonics = flattenSHArray(computeYlm(θ, ϕ, lmax = lₘₐₓ))
+    harmonics' * coeffs
+  end
+end
+\end{jllisting}
       \item
-        Below are figures of the solution at different times:
-        \begin{figure}[!ht]
+        This part is now easy since we have all the ingredients.
+\begin{jllisting}
+  ϕ₀(θ, ϕ) = exp( - θ^2 / 0.4);
+  ψ₀(θ, ϕ) = 0;
+  sol = solveWaveEquation(ϕ₀, ψ₀, lmax, 0, 10)
+\end{jllisting}
+
+And I use this solution to reconstruct the function for the solution.
+\begin{jllisting}
+sizA = Int(size(sol.u[1])[1] / 2)
+
+firstprofileWhole = sol[1][begin:sizA]
+myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)
+\end{jllisting}
+
+      \item
+        Below are figures of the solution at different times. The plots show the solutions of the wave equations as function of $\theta$ for the $\phi = \pi / 2$.
+        I found these graphs the easiest to interpret.
+        I might have gone overboard with the testing--I did five different solutions for cut-offs $l_\text{max} = 2, 4, 6, 8, 10$.
+        As Figure~\ref{fig:lmax2} shows, in particular the first subfigure, for $l_\text{max} = 2$, the expansion does not capture the profile of the initial conditions very well, but the problem can still be evolved and a solution obtained..
+        As Figure~\ref{fig:lmax4} shows, for $l_\text{max} = 4$, the motion of the wave is clearer, but there are some ripples in the solution that are not apparent in the true solution. 
+        The ripples present for the cut-off $l_\text{max} = 4$ slowly become smaller for larger cut-offs, which is indicative of a convergent solution.
+        This covergence can be qualititatively seen by comparing Figures~\ref{fig:lmax6}, \ref{fig:lmax8} and \ref{fig:lmax10}, keeping in mind that the profiles are printed for slightly different times.
+
+        \begin{figure}[H]
           \centering
           \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice2.png}
-
-          \caption{$l_\text{max} = 2$}
+          \caption{Solution of the wave equation with cut-off $l_\text{max} = 2$}
+          \label{fig:lmax2}
         \end{figure}
         \newpage
-        \begin{figure}[!ht]
+        \begin{figure}[H]
           \centering
           \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice4.png}
-          \caption{$l_\text{max} = 4$}
+          \caption{Solution of the wave equation with cut-off $l_\text{max} = 4$}
+          \label{fig:lmax4}
         \end{figure}
         \newpage
-        \begin{figure}[!ht]
+        \begin{figure}[H]
           \centering
           \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice6.png}
-          \caption{$l_\text{max} = 6$}
+          \caption{Solution of the wave equation with cut-off $l_\text{max} = 6$}
+          \label{fig:lmax6}
         \end{figure}
         \newpage
-        \begin{figure}[!ht]
+        \begin{figure}[H]
           \centering
           \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice8.png}
-          \caption{$l_\text{max} = 8$}
+          \caption{Solution of the wave equation with cut-off $l_\text{max} = 8$}
+          \label{fig:lmax8}
         \end{figure}
         \newpage
-        \begin{figure}[!ht]
+        \begin{figure}[H]
           \centering
           \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice10.png}
-          \caption{$l_\text{max} = 10$}
+          \caption{Solution of the wave equation with cut-off $l_\text{max} = 10$}
+          \label{fig:lmax10}
         \end{figure}
         \newpage
     \end{enumerate}
+    \newpage
+  \item
+    I also did the heat equation out of interest.
+\begin{jllisting}
+function heat(U)
+  LaplacianSphericalCoefficientsArrays(U)
+end
+
+ϕ₀(θ, ϕ) = exp(- θ^2)
+U0 = flattenSHArray(expandSphericalHarmonics2(ϕ₀, 15)[1])
+prob = ODEProblem((U,p,t) -> heat(U), U0, (0.0, 10.0))
+
+alg = Rodas5(autodiff = false)
+solheat = solve(prob, alg);
+\end{jllisting}
+  
+  Figure~\ref{fig:heat} shows the numerical solution of the heat equation with the heat dispersing over the sphere.
+  \begin{figure}[H]
+    \centering
+    \includegraphics[scale = 0.23]{HeatTimesOnSphere.png}
+    \caption{Solution of the heat equation with cut-off $l_\text{max} = 15$}
+    \label{fig:heat}
+  \end{figure}
 \end{enumerate}
 \end{document}

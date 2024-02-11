@@ -97,16 +97,6 @@ function LaplacianSphericalCoefficientsArrays(coeffs)
 end
 
 
-##ϕ₀(θ, ϕ) = exp(- 4 * θ^4);
-##ψ₀(θ, ϕ) = 0;
-##
-##ϕ₀SphericalCoeffs = expandSphericalHarmonics2(ϕ₀, 15)[1];
-##ψ₀SphericalCoeffs = expandSphericalHarmonics2(ψ₀, 15)[1];
-
-##U0 = vcat( flattenSHArray(ϕ₀SphericalCoeffs, 15), flattenSHArray(ψ₀SphericalCoeffs, 15))
-##prob = ODEProblem((U,p,t) -> waveSystem(U), U0, (0.0, 10.0))
-##sol = solve(prob);
-
 #Calculate a function from spherical harmonic represntation coefficients
 function functionFromSphericalCoefficients(coeffs)
     l = 0
@@ -143,6 +133,155 @@ function solveWaveEquation(ϕ₀, ψ₀, N, t₀, t₁)
   prob = ODEProblem((U,p,t) -> waveSystem(U), U0, (t₀, t₁))
   solve(prob, alg)
 end
+
+for lmax in [2, 4, 6, 8, 10]
+  ϕ₀(θ, ϕ) = exp( - θ^2 / 0.4);
+  ψ₀(θ, ϕ) = 0;
+  sol = solveWaveEquation(ϕ₀, ψ₀, lmax, 0, 10)
+
+  #Only take the first items
+  sizA = Int(size(sol.u[1])[1] / 2)
+
+  θs = LinRange(0, π, 100)
+  ϕs = LinRange(0,  2 * π, 100)
+
+  xs = [sin(θ) * cos(ϕ) for θ in θs, ϕ in ϕs]
+
+  ys = [sin(θ) * sin(ϕ) for θ in θs, ϕ in ϕs]
+
+  zs = [cos(θ) for θ in θs, ϕ in ϕs]
+
+  firstprofileWhole = sol[1][begin:sizA]
+  myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)
+
+  cols = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
+
+  points = Observable(zs)
+  HB_vn = Observable(cols)
+
+  fps = 10
+  nframes = size(sol.t)[1]
+
+  scene = surface(xs, ys, points, color = HB_vn, axis=(type=Axis3,), colorrange=(-0.5,1), colormap = reverse(cgrad(:thermal)))
+
+  record(scene, "GaussianWaveSurfaceOnSphereFromScript"*string(lmax)*".gif"; framerate = fps) do io
+      for it = 1:nframes
+          firstprofileWhole = sol[it][begin:sizA]
+          myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
+          cols = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
+          points[] = zs
+          HB_vn[] = cols
+          recordframe!(io)
+      end
+  end
+
+  firstprofileWhole = sol[1][begin:sizA]
+  myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)
+
+  zs = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
+
+  HB_vn = points = Observable(zs)
+
+  fps = 10
+  nframes = size(sol)[2]
+
+  scene = surface(θs, ϕs, HB_vn, axis=(type=Axis3,), colorrange=(-1,1), colormap = reverse(cgrad(:thermal)))
+
+
+  record(scene, "GaussianWaveSurfaceFromScript"*string(lmax)*".gif"; framerate = fps) do io
+      for it = 1:nframes
+          firstprofileWhole = sol[it][begin:sizA]
+          myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
+          zs = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
+      
+          HB_vn[] = zs
+          recordframe!(io)
+      end
+  end
+
+  nslices = 5
+
+  f = Figure(size=(520, nslices * 320))#Figure(size=(400, trunc(Int, 400 * 5)))
+  for (k, i) in enumerate(1:trunc(Int, nframes / nslices):nframes)#trunc(Int, nframes / 5 + 1):nframes
+    Axis3(f[k, 1], viewmode = :fit)
+    firstprofileWhole = sol[i][begin:sizA]
+    myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
+    zs = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
+    surface!(θs, ϕs, zs, colorrange=(-1,1), colormap = reverse(cgrad(:thermal)))
+  end
+
+  save("GaussianWaveSurfaceFromScriptTimes"*string(lmax)*".png", f)
+
+  f = Figure(size=(520, nslices * 320))#Figure(size=(400, trunc(Int, 400 * 5)))
+  for (k, i) in enumerate(1:trunc(Int, nframes / nslices):nframes)#trunc(Int, nframes / 5 + 1):nframes
+    solTime = @sprintf "%.2f" sol.t[i]
+#    title=L"Solution at time $t = %$(solTime)$"
+    ax = Axis(f[k, 1], title=L"Solution at time $t = %$(solTime)$", xlabel = L"\theta", ylabel = L"\phi")#@sprintf "Solution at t = %.2fs" sol.t[i], xlabel = L"\sum_a^b{xy} + \mathscr{L}", ylabel = L"\sum_a^b{xy} + \mathscr{L}")
+    firstprofileWhole = sol[i][begin:sizA]
+    myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
+    zs = (y -> real(myFuncFirst(y, pi / 2))).(θs)
+    lines!(θs, zs)
+  end
+  save("GaussianWaveSurfaceFromScriptTimesSlice"*string(lmax)*".png", f)
+end
+
+
+function heat(U)
+  LaplacianSphericalCoefficientsArrays(U)
+end
+
+ϕ₀(θ, ϕ) = exp(- θ^2 / 0.4)
+U0 = expandSphericalHarmonics2(ϕ₀, 15)[1]
+prob = ODEProblem((U,p,t) -> heat(U), U0, (0.0, 10.0))
+
+alg = Rodas5(autodiff = false)
+solheat = solve(prob, alg);
+
+θs = LinRange(0, π, 100)
+ϕs = LinRange(0,  2 * π, 100)
+
+xs = [sin(θ) * cos(ϕ) for θ in θs, ϕ in ϕs]
+
+ys = [sin(θ) * sin(ϕ) for θ in θs, ϕ in ϕs]
+
+zs = [cos(θ) for θ in θs, ϕ in ϕs]
+
+firstprofileWhole = solheat[1][begin:256]
+myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)
+
+cols = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
+
+points = Observable(zs)
+HB_vn = Observable(cols)
+
+fps = 1
+nframes = size(solheat.t)[1]
+
+scene = surface(xs, ys, points, color = HB_vn, axis=(type=Axis3,), colorrange=(-0.2,0.9), colormap = reverse(cgrad(:redsblues)))
+
+record(scene, "heatSurfaceOnSphereFromScript.gif"; framerate = fps) do io
+  for it = 1:nframes
+    firstprofileWhole = solheat[it][begin:256]
+    myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
+    cols = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
+    points[] = zs
+    HB_vn[] = cols
+    recordframe!(io)
+  end
+end
+
+nslices = 6
+
+f = Figure(size=(520, div(nslices * 320, 2)))
+for (k, i) in enumerate(1:trunc(Int, nframes / nslices):nframes)
+  solTime = @sprintf "%.2f" solheat.t[i]
+  Axis3(f[div(k - 1, 2) + 1 , (k - 1) % 2 + 1], title=L"Solution at time $t = %$(solTime)$", viewmode = :fit)
+  profile = solheat[i]
+  solFunc = functionFromSphericalCoefficients(profile)    
+  cols = [real(solFunc(θ, ϕ)) for θ in θs, ϕ in ϕs]
+  surface!(xs, ys, zs, colorrange=(-0.4,0.7), color = cols, colormap = :thermal)
+end
+save("HeatTimesOnSphere.png", f)
 
 ###
 ####θs = LinRange(0, π, 100)
@@ -322,55 +461,8 @@ end
 ####end
 ####
 ####
-###function heat(U)
-###    LaplacianSphericalCoefficientsArrays(U)
-###end
-###
-###ϕ₀(θ, ϕ) = exp(- θ^2)
-###U0 = flattenSHArray(expandSphericalHarmonics2(ϕ₀, 15)[1])
-###prob = ODEProblem((U,p,t) -> heat(U), U0, (0.0, 10.0))
-###
-###alg = Rodas5(autodiff = false)
-###solheat = solve(prob, alg);
-###
-###θs = LinRange(0, π, 100)
-###ϕs = LinRange(0,  2 * π, 100)
-###
-###xs = [sin(θ) * cos(ϕ) for θ in θs, ϕ in ϕs]
-###
-###ys = [sin(θ) * sin(ϕ) for θ in θs, ϕ in ϕs]
-###
-###zs = [cos(θ) for θ in θs, ϕ in ϕs]
-###
-###firstprofileWhole = solheat[1][begin:256]
-###myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)
-###
-###cols = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
-###
-###points = Observable(zs)
-###HB_vn = Observable(cols)
-###
-###fps = 1
-###nframes = size(solheat.t)[1]
-###
-###scene = surface(xs, ys, points, color = HB_vn, axis=(type=Axis3,), colorrange=(-0.2,0.9), colormap = reverse(cgrad(:redsblues)))
-###
-###record(scene, "heatSurfaceOnSphereFromScript.gif"; framerate = fps) do io
-###    for it = 1:nframes
-###        firstprofileWhole = solheat[it][begin:256]
-###        myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
-###        cols = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
-###        points[] = zs
-###        HB_vn[] = cols
-###        recordframe!(io)
-###        #(...) 
-###    end
-###end
 
 
-
-ϕ₀(θ, ϕ) = cos(8 * θ);
-ψ₀(θ, ϕ) = 0;
 
 #θs = LinRange(0, π, 100)
 #ϕs = LinRange(0, 2 * π, 100)
@@ -396,97 +488,6 @@ end
 #
 #exit()
 
-
-for lmax in [2, 4, 6, 8, 10]
-  ϕ₀(θ, ϕ) = exp( - θ^2 / 0.4);
-  ψ₀(θ, ϕ) = 0;
-  sol = solveWaveEquation(ϕ₀, ψ₀, lmax, 0, 10)
-
-  #Only take the first items
-  sizA = Int(size(sol.u[1])[1] / 2)
-
-  θs = LinRange(0, π, 100)
-  ϕs = LinRange(0,  2 * π, 100)
-
-  xs = [sin(θ) * cos(ϕ) for θ in θs, ϕ in ϕs]
-
-  ys = [sin(θ) * sin(ϕ) for θ in θs, ϕ in ϕs]
-
-  zs = [cos(θ) for θ in θs, ϕ in ϕs]
-
-  firstprofileWhole = sol[1][begin:sizA]
-  myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)
-
-  cols = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
-
-  points = Observable(zs)
-  HB_vn = Observable(cols)
-
-  fps = 10
-  nframes = size(sol.t)[1]
-
-  scene = surface(xs, ys, points, color = HB_vn, axis=(type=Axis3,), colorrange=(-0.5,1), colormap = reverse(cgrad(:thermal)))
-
-  record(scene, "GaussianWaveSurfaceOnSphereFromScript"*string(lmax)*".gif"; framerate = fps) do io
-      for it = 1:nframes
-          firstprofileWhole = sol[it][begin:sizA]
-          myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
-          cols = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
-          points[] = zs
-          HB_vn[] = cols
-          recordframe!(io)
-      end
-  end
-
-  firstprofileWhole = sol[1][begin:sizA]
-  myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)
-
-  zs = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
-
-  HB_vn = points = Observable(zs)
-
-  fps = 10
-  nframes = size(sol)[2]
-
-  scene = surface(θs, ϕs, HB_vn, axis=(type=Axis3,), colorrange=(-1,1), colormap = reverse(cgrad(:thermal)))
-
-
-  record(scene, "GaussianWaveSurfaceFromScript"*string(lmax)*".gif"; framerate = fps) do io
-      for it = 1:nframes
-          firstprofileWhole = sol[it][begin:sizA]
-          myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
-          zs = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
-      
-          HB_vn[] = zs
-          recordframe!(io)
-      end
-  end
-
-  nslices = 5
-
-  f = Figure(size=(520, nslices * 320))#Figure(size=(400, trunc(Int, 400 * 5)))
-  for (k, i) in enumerate(1:trunc(Int, nframes / nslices):nframes)#trunc(Int, nframes / 5 + 1):nframes
-    Axis3(f[k, 1], viewmode = :fit)
-    firstprofileWhole = sol[i][begin:sizA]
-    myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
-    zs = [real(myFuncFirst(θ, ϕ)) for θ in θs, ϕ in ϕs]
-    surface!(θs, ϕs, zs, colorrange=(-1,1), colormap = reverse(cgrad(:thermal)))
-  end
-
-  save("GaussianWaveSurfaceFromScriptTimes"*string(lmax)*".png", f)
-
-  f = Figure(size=(520, nslices * 320))#Figure(size=(400, trunc(Int, 400 * 5)))
-  for (k, i) in enumerate(1:trunc(Int, nframes / nslices):nframes)#trunc(Int, nframes / 5 + 1):nframes
-    solTime = @sprintf "%.2f" sol.t[i]
-#    title=L"Solution at time $t = %$(solTime)$"
-    ax = Axis(f[k, 1], title=L"Solution at time $t = %$(solTime)$", xlabel = L"\theta", ylabel = L"\phi")#@sprintf "Solution at t = %.2fs" sol.t[i], xlabel = L"\sum_a^b{xy} + \mathscr{L}", ylabel = L"\sum_a^b{xy} + \mathscr{L}")
-    firstprofileWhole = sol[i][begin:sizA]
-    myFuncFirst = functionFromSphericalCoefficients(firstprofileWhole)    
-    zs = (y -> real(myFuncFirst(y, pi / 2))).(θs)
-    lines!(θs, zs)
-  end
-  save("GaussianWaveSurfaceFromScriptTimesSlice"*string(lmax)*".png", f)
-end
 
 #ϕ₀(θ, ϕ) = cos(θ)^2;
 #ψ₀(θ, ϕ) = 0;
