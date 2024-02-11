@@ -1,0 +1,134 @@
+\documentclass[12pt,a4]{article}
+\usepackage{physics, amsmath,amsfonts,amsthm,amssymb, mathtools,steinmetz, gensymb, siunitx}	% LOADS USEFUL MATH STUFF
+\usepackage{xcolor,graphicx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[left=45pt, top=20pt, right=45pt, bottom=45pt ,a4paper]{geometry} 				% ADJUSTS PAGE
+\usepackage{setspace}
+\usepackage{tikz}
+\usepackage{pgf,tikz,pgfplots,wrapfig}
+\usepackage{mathrsfs}
+\usepackage{fancyhdr}
+\usepackage{float}
+\usepackage{array}
+\usepackage{booktabs,multirow}
+\usepackage{bm}
+\usepackage{tensor}
+\usepackage{listings}
+\usepackage{slashed}
+\usepackage{tikz-feynman}
+ \lstset{
+    basicstyle=\ttfamily\small,
+    numberstyle=\footnotesize,
+    numbers=left,
+    backgroundcolor=\color{gray!10},
+    frame=single,
+    tabsize=2,
+    rulecolor=\color{black!30},
+    title=\lstname,
+    escapeinside={\%*}{*)},
+    breaklines=true,
+    breakatwhitespace=true,
+    framextopmargin=2pt,
+    framexbottommargin=2pt,
+    inputencoding=utf8,
+    extendedchars=true,
+    literate={á}{{$\rho$}}1 {ã}{{\~a}}1 {é}{{\'e}}1,
+}
+\DeclareMathOperator{\sign}{sgn}
+
+\usetikzlibrary{decorations.text, calc}
+\pgfplotsset{compat=1.7}
+
+\usetikzlibrary{decorations.pathreplacing,decorations.markings}
+\usepgfplotslibrary{fillbetween}
+
+\newcommand{\vect}[1]{\boldsymbol{#1}}
+
+\usepackage{hyperref}
+
+%\usepackage[style= ACM-Reference-Format, maxbibnames=6, minnames=1,maxnames = 1]{biblatex}
+%\addbibresource{references.bib}
+
+
+\hypersetup{pdfborder={0 0 0},colorlinks=true,linkcolor=black,urlcolor=cyan,}
+\allowdisplaybreaks
+%\hypersetup{
+%
+%    colorlinks=true,
+%
+%    linkcolor=blue,
+%
+%    filecolor=magenta,      
+%
+%    urlcolor=cyan,
+%
+%    pdftitle={An Example},
+%
+%    pdfpagemode=FullScreen,
+%
+%    }
+%}
+
+\title{
+\textsc{Standard Model Homework 2}
+}
+\author{\textsc{J L Gouws}
+}
+\date{\today
+\\[1cm]}
+
+
+
+\usepackage{graphicx}
+\usepackage{array}
+
+
+
+
+\begin{document}
+\thispagestyle{empty}
+
+\maketitle
+
+This homework is a bit rough, but I am submitting it anyway for feedback.
+\begin{enumerate}
+  \item
+    \begin{enumerate}
+      \item
+      \item
+        Below are figures of the solution at different times:
+        \begin{figure}[!ht]
+          \centering
+          \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice2.png}
+
+          \caption{$l_\text{max} = 2$}
+        \end{figure}
+        \newpage
+        \begin{figure}[!ht]
+          \centering
+          \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice4.png}
+          \caption{$l_\text{max} = 4$}
+        \end{figure}
+        \newpage
+        \begin{figure}[!ht]
+          \centering
+          \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice6.png}
+          \caption{$l_\text{max} = 6$}
+        \end{figure}
+        \newpage
+        \begin{figure}[!ht]
+          \centering
+          \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice8.png}
+          \caption{$l_\text{max} = 8$}
+        \end{figure}
+        \newpage
+        \begin{figure}[!ht]
+          \centering
+          \includegraphics[scale = 0.23]{GaussianWaveSurfaceFromScriptTimesSlice10.png}
+          \caption{$l_\text{max} = 10$}
+        \end{figure}
+        \newpage
+    \end{enumerate}
+\end{enumerate}
+\end{document}

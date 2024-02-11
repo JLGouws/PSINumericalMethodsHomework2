@@ -1,6 +1,14 @@
 *.png
+manual.pdf
 *.aux
 *.out
 *.log
 *.gif
 *.mp4
+jlcode-master
+jlcode-master.zip
+*.ttf
+testfile.jl
+testfile2.jl
+createucclist.jl
+createkwlists.jl
